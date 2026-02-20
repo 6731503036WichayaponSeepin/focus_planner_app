@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 enum Priority {
@@ -54,6 +55,8 @@ class TaskModel {
   final DateTime? dueDate;
   final Priority priority;
   final bool isCompleted;
+  final DateTime? completedAt; // ✅ เพิ่ม
+  final int? focusTimeSpent; // ✅ เวลา Focus ที่ใช้ (นาที)
 
   TaskModel({
     required this.id,
@@ -63,6 +66,8 @@ class TaskModel {
     this.dueDate,
     this.priority = Priority.none,
     this.isCompleted = false,
+    this.completedAt,
+    this.focusTimeSpent,
   });
 
   TaskModel copyWith({
@@ -73,6 +78,8 @@ class TaskModel {
     DateTime? dueDate,
     Priority? priority,
     bool? isCompleted,
+    DateTime? completedAt,
+    int? focusTimeSpent,
   }) {
     return TaskModel(
       id: id ?? this.id,
@@ -82,9 +89,44 @@ class TaskModel {
       dueDate: dueDate ?? this.dueDate,
       priority: priority ?? this.priority,
       isCompleted: isCompleted ?? this.isCompleted,
+      completedAt: completedAt ?? this.completedAt,
+      focusTimeSpent: focusTimeSpent ?? this.focusTimeSpent,
+    );
+  }
+
+  // ✅ Convert to Firestore
+  Map<String, dynamic> toFirestore() {
+    return {
+      'title': title,
+      'description': description,
+      'category': category,
+      'dueDate': dueDate != null ? Timestamp.fromDate(dueDate!) : null,
+      'priority': priority.label,
+      'isCompleted': isCompleted,
+      'completedAt': completedAt != null ? Timestamp.fromDate(completedAt!) : null,
+      'focusTimeSpent': focusTimeSpent,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+  }
+
+  // ✅ Convert from Firestore
+  factory TaskModel.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return TaskModel(
+      id: doc.id,
+      title: data['title'] ?? '',
+      description: data['description'] ?? '',
+      category: data['category'] ?? 'Work',
+      dueDate: data['dueDate'] != null
+          ? (data['dueDate'] as Timestamp).toDate()
+          : null,
+      priority: Priority.fromString(data['priority']),
+      isCompleted: data['isCompleted'] ?? false,
+      completedAt: data['completedAt'] != null
+          ? (data['completedAt'] as Timestamp).toDate()
+          : null,
+      focusTimeSpent: data['focusTimeSpent'],
     );
   }
 }
-
-// ชื่อเก่า Task สำหรับความเข้ากันได้
-typedef Task = TaskModel;

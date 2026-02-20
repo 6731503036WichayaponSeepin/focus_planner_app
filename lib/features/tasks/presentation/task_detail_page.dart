@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../data/task_model.dart';
 import '../data/task_repository.dart';
 import '../../focus/presentation/stay_focused_page.dart';
@@ -19,7 +20,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   late TaskModel _currentTask;
   late TaskRepository _repository;
   bool _isLoading = false;
-  int _focusTime = 25; // Default 25 mins
+  late int _focusTime; // ✅ เปลี่ยนจาก int = 25
   TimeOfDay _reminderTime = TimeOfDay.now();
 
   @override
@@ -27,6 +28,21 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     super.initState();
     _currentTask = widget.task;
     _repository = TaskRepositoryImpl();
+    _loadFocusTimeFromSettings();
+  }
+
+  // ✅ Load Focus Time from Settings
+  Future<void> _loadFocusTimeFromSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        _focusTime = prefs.getInt('focusTime') ?? 25; // Default 25 mins
+      });
+    } catch (e) {
+      setState(() {
+        _focusTime = 25; // Default if error
+      });
+    }
   }
 
   String _formatDate(DateTime? date) {
@@ -125,7 +141,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                       ),
                       const SizedBox(height: 12),
 
-                      // ✅ Focus Time
+                      // ✅ Focus Time - อ่านจาก Settings
                       _buildDetailCardWithValue(
                         icon: Icons.timer_outlined,
                         title: 'Focus Time',
@@ -416,6 +432,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
             for (int i = 15; i <= 60; i += 5)
               ListTile(
                 title: Text('$i minutes'),
+                selected: _focusTime == i,
                 onTap: () => Navigator.pop(context, i),
               ),
           ],
@@ -439,7 +456,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     }
   }
 
-  // ✅ Start Focus Timer - นำทางไป StayFocusedPage
+  // ✅ Start Focus Timer - นำทางไป StayFocusedPage พร้อมเวลาจาก Settings
   void _startFocusTimer() {
     setState(() => _isLoading = true);
 
@@ -450,7 +467,8 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           MaterialPageRoute(
             builder: (context) => StayFocusedPage(
               taskTitle: _currentTask.title,
-              initialMinutes: _focusTime,
+              initialMinutes: _focusTime, // ✅ ใช้เวลาจาก Settings
+              taskId: _currentTask.id,
             ),
           ),
         );

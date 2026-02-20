@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../data/task_repository.dart';
+import '../data/task_model.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({Key? key}) : super(key: key);
@@ -12,12 +13,17 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   late TaskRepository _repository;
   late Future<Map<String, dynamic>> _stats;
+  late Future<List<TaskModel>> _completedTasks;
 
   @override
   void initState() {
     super.initState();
-    _repository = TaskRepositoryImpl();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      _repository = TaskRepositoryImpl(userId: user.uid); // ✅ เพิ่ม userId
+    }
     _loadStats();
+    _loadCompletedTasks();
   }
 
   Future<void> _loadStats() async {
@@ -26,13 +32,21 @@ class _ProfilePageState extends State<ProfilePage> {
         _repository.getTotalTasksCount(),
         _repository.getCompletedTasksCount(),
         _repository.getPendingTasksCount(),
+        _repository.getTotalFocusTimeSpent(),
       ]).then((results) {
         return {
           'total': results[0],
           'completed': results[1],
           'pending': results[2],
+          'focusTime': results[3],
         };
       });
+    });
+  }
+
+  void _loadCompletedTasks() {
+    setState(() {
+      _completedTasks = _repository.getCompletedTasks();
     });
   }
 
@@ -52,20 +66,15 @@ class _ProfilePageState extends State<ProfilePage> {
         padding: const EdgeInsets.only(bottom: 20),
         child: Column(
           children: [
-            // ✅ Header dengan wavy design dan profile
             _buildHeaderSection(currentUser),
             const SizedBox(height: 20),
-            // ✅ Focus Completed Card
             _buildFocusCompletedCard(),
             const SizedBox(height: 12),
-            // ✅ Focus Stats Cards
             _buildFocusStatsCard(),
             const SizedBox(height: 12),
-            // ✅ Weekly Plan Card
             _buildWeeklyPlanCard(),
             const SizedBox(height: 12),
-            // ✅ Daily Achievements Card
-            _buildDailyAchievementsCard(),
+            _buildCompletedTasksCard(),
           ],
         ),
       ),
@@ -79,18 +88,15 @@ class _ProfilePageState extends State<ProfilePage> {
 
     return Stack(
       children: [
-        // Wavy Background
         CustomPaint(
           size: const Size(double.infinity, 200),
           painter: WaveHeaderPainter(),
         ),
-        // Content
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
           child: Column(
             children: [
               const SizedBox(height: 40),
-              // ✅ Profile Picture Circle
               Container(
                 width: 100,
                 height: 100,
@@ -126,12 +132,11 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
               const SizedBox(height: 16),
-              // ✅ Name and Edit Button
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    'Wichayapon Demwiset',
+                    name,
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -185,38 +190,47 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ],
         ),
-        child: Row(
-          children: [
-            Text(
-              '🏆',
-              style: TextStyle(fontSize: 40),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Focus Completed',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                      fontWeight: FontWeight.w500,
-                    ),
+        child: FutureBuilder<Map<String, dynamic>>(
+          future: _stats,
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const CircularProgressIndicator();
+            }
+            final stats = snapshot.data!;
+            return Row(
+              children: [
+                Text(
+                  '🏆',
+                  style: TextStyle(fontSize: 40),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Focus Completed',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${stats['completed']}',
+                        style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    '78',
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -238,82 +252,91 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ],
         ),
-        child: Column(
-          children: [
-            // Focus Sessions
-            Row(
+        child: FutureBuilder<Map<String, dynamic>>(
+          future: _stats,
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const CircularProgressIndicator();
+            }
+            final stats = snapshot.data!;
+            final focusHours = (stats['focusTime'] as int) ~/ 60;
+            final focusMins = (stats['focusTime'] as int) % 60;
+            return Column(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.check_circle,
-                    color: Colors.black54,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'Focus Sessions',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black87,
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.check_circle,
+                        color: Colors.black54,
+                        size: 20,
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Focus Sessions',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '${stats['completed']}',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
                 ),
-                const Text(
-                  '124',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.access_time,
+                        color: Colors.black54,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Total Focus Time',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '$focusHours hrs $focusMins mins',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
                 ),
               ],
-            ),
-            const SizedBox(height: 16),
-            // Total Focus Time
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.access_time,
-                    color: Colors.black54,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'Total Focus Time',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ),
-                const Text(
-                  '30 hrs 45 mins',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-              ],
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -347,7 +370,6 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
             const SizedBox(height: 16),
-            // Work
             Row(
               children: [
                 Text(
@@ -395,7 +417,6 @@ class _ProfilePageState extends State<ProfilePage> {
               ],
             ),
             const SizedBox(height: 16),
-            // Study
             Row(
               children: [
                 Text(
@@ -448,7 +469,8 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildDailyAchievementsCard() {
+  // ✅ Completed Tasks Card
+  Widget _buildCompletedTasksCard() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
@@ -470,7 +492,7 @@ class _ProfilePageState extends State<ProfilePage> {
             Row(
               children: [
                 const Text(
-                  'Daily Achievements',
+                  'Completed Tasks',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -479,39 +501,41 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  '🎉',
-                  style: TextStyle(fontSize: 20),
+                  '✓',
+                  style: TextStyle(fontSize: 20, color: Colors.green),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            const Text(
-              '4 tasks completed today',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey,
-              ),
-            ),
             const SizedBox(height: 16),
-            // Tasks
-            _buildAchievementItem(
-              '✓ Finish Mobile App Assignmen',
-              '3h 58m',
-            ),
-            const SizedBox(height: 12),
-            _buildAchievementItem(
-              '✓ Prepare Presentation',
-              '2h 14m',
-            ),
-            const SizedBox(height: 12),
-            _buildAchievementItem(
-              '✓ Physics Project Research',
-              '1h 46m',
-            ),
-            const SizedBox(height: 12),
-            _buildAchievementItem(
-              '✓ Read Chapter 5 Economics',
-              '9h 4',
+            FutureBuilder<List<TaskModel>>(
+              future: _completedTasks,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const CircularProgressIndicator();
+                }
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Text(
+                    'No completed tasks yet',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 14,
+                    ),
+                  );
+                }
+                final tasks = snapshot.data!;
+                return Column(
+                  children: List.generate(
+                    tasks.length,
+                    (index) {
+                      final task = tasks[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildCompletedTaskItem(task),
+                      );
+                    },
+                  ),
+                );
+              },
             ),
           ],
         ),
@@ -519,48 +543,56 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildAchievementItem(String title, String time) {
-    return Row(
-      children: [
-        Container(
-          width: 20,
-          height: 20,
-          decoration: BoxDecoration(
-            color: Theme.of(context).primaryColor,
-            shape: BoxShape.circle,
+  Widget _buildCompletedTaskItem(TaskModel task) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        border: Border.all(color: Colors.green.shade200),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.check_circle,
+                color: Colors.green,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  task.title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+            ],
           ),
-          child: const Center(
-            child: Icon(
-              Icons.check,
-              color: Colors.white,
-              size: 12,
-            ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const SizedBox(width: 28),
+              Text(
+                'Focus: ${task.focusTimeSpent ?? 0} mins',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey,
+                ),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.black87,
-            ),
-          ),
-        ),
-        Text(
-          time,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.grey,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
-// Wave Header Painter
 class WaveHeaderPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -578,7 +610,6 @@ class WaveHeaderPainter extends CustomPainter {
 
     canvas.drawPath(path, paint);
 
-    // Draw decorative circles
     final circlePaint = Paint()
       ..color = Colors.black.withOpacity(0.2)
       ..style = PaintingStyle.fill;

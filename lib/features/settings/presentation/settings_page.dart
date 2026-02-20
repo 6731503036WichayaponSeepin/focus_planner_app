@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/theme_provider.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({Key? key}) : super(key: key);
@@ -9,6 +12,91 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
+  late SharedPreferences _prefs;
+  int _focusTimeMinutes = 25;
+  int _breakTimeMinutes = 5;
+  bool _notificationsEnabled = true;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    try {
+      _prefs = await SharedPreferences.getInstance();
+      setState(() {
+        _focusTimeMinutes = _prefs.getInt('focusTime') ?? 25;
+        _breakTimeMinutes = _prefs.getInt('breakTime') ?? 5;
+        _notificationsEnabled = _prefs.getBool('notifications') ?? true;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading settings: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveFocusTime(int minutes) async {
+    try {
+      await _prefs.setInt('focusTime', minutes);
+      setState(() => _focusTimeMinutes = minutes);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Focus time updated to $minutes minutes'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving settings: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveBreakTime(int minutes) async {
+    try {
+      await _prefs.setInt('breakTime', minutes);
+      setState(() => _breakTimeMinutes = minutes);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Break time updated to $minutes minutes'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving settings: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveNotifications(bool enabled) async {
+    try {
+      await _prefs.setBool('notifications', enabled);
+      setState(() => _notificationsEnabled = enabled);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving settings: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _logout() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -34,7 +122,6 @@ class _SettingsPageState extends State<SettingsPage> {
     if (confirmed == true) {
       try {
         await FirebaseAuth.instance.signOut();
-        // ✅ AuthGate จะจับการเปลี่ยนแปลง auth state และนำทางกลับหน้า Login อัตโนมัติ
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Logged out successfully')),
@@ -50,8 +137,206 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  void _showFocusTimeDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Focus Time'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Current: $_focusTimeMinutes minutes',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 20),
+            SingleChildScrollView(
+              child: Column(
+                children: [15, 20, 25, 30, 45, 60]
+                    .map(
+                      (minutes) => ListTile(
+                        title: Text('$minutes minutes'),
+                        selected: _focusTimeMinutes == minutes,
+                        onTap: () {
+                          Navigator.pop(context);
+                          _saveFocusTime(minutes);
+                        },
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showBreakTimeDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Break Time'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Current: $_breakTimeMinutes minutes',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 20),
+            SingleChildScrollView(
+              child: Column(
+                children: [3, 5, 10, 15, 20]
+                    .map(
+                      (minutes) => ListTile(
+                        title: Text('$minutes minutes'),
+                        selected: _breakTimeMinutes == minutes,
+                        onTap: () {
+                          Navigator.pop(context);
+                          _saveBreakTime(minutes);
+                        },
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showNotificationsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Notifications'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Get notified when:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            CheckboxListTile(
+              title: const Text('Focus session starts'),
+              value: _notificationsEnabled,
+              onChanged: (value) {
+                Navigator.pop(context);
+                _saveNotifications(value ?? false);
+              },
+            ),
+            CheckboxListTile(
+              title: const Text('Break time ends'),
+              value: _notificationsEnabled,
+              onChanged: (value) {
+                Navigator.pop(context);
+                _saveNotifications(value ?? false);
+              },
+            ),
+            CheckboxListTile(
+              title: const Text('Task reminders'),
+              value: _notificationsEnabled,
+              onChanged: (value) {
+                Navigator.pop(context);
+                _saveNotifications(value ?? false);
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showHelpDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Help & Support'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildHelpSection(
+                '📝 Creating Tasks',
+                '1. Go to Home tab\n2. Click the + button\n3. Fill in task details\n4. Select due date\n5. Priority is set automatically',
+              ),
+              const SizedBox(height: 16),
+              _buildHelpSection(
+                '⏱️ Focus Timer',
+                '1. Select a task\n2. Click "Start Focus Timer"\n3. Timer will start counting\n4. Pause or complete when done\n5. Stats will be saved',
+              ),
+              const SizedBox(height: 16),
+              _buildHelpSection(
+                '📊 Profile & Stats',
+                '• View completed tasks\n• Track focus time\n• See achievements\n• Monitor progress',
+              ),
+              const SizedBox(height: 16),
+              _buildHelpSection(
+                '⚙️ Settings',
+                '• Customize focus time\n• Adjust break duration\n• Toggle notifications\n• Manage preferences',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it!'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHelpSection(String title, String content) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          content,
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.5,
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
@@ -59,6 +344,7 @@ class _SettingsPageState extends State<SettingsPage> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
+        elevation: 0,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -73,46 +359,65 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
             const SizedBox(height: 24),
-            _buildSettingItem(
+
+            // ✅ Theme Toggle
+            Consumer<ThemeProvider>(
+              builder: (context, themeProvider, _) {
+                return _buildSettingCard(
+                  icon: themeProvider.isDarkMode
+                      ? Icons.dark_mode_rounded
+                      : Icons.light_mode_rounded,
+                  title: 'Theme',
+                  subtitle: themeProvider.isDarkMode
+                      ? 'Dark Mode'
+                      : 'Light Mode',
+                  onTap: () {
+                    themeProvider.toggleTheme();
+                  },
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+
+            // ✅ Focus Time Settings
+            _buildSettingCard(
+              icon: Icons.timer,
+              title: 'Focus Time',
+              subtitle: '$_focusTimeMinutes minutes per session',
+              onTap: _showFocusTimeDialog,
+            ),
+            const SizedBox(height: 12),
+
+            // ✅ Break Time Settings
+            _buildSettingCard(
+              icon: Icons.lunch_dining,
+              title: 'Break Time',
+              subtitle: '$_breakTimeMinutes minutes per break',
+              onTap: _showBreakTimeDialog,
+            ),
+            const SizedBox(height: 12),
+
+            // ✅ Notifications Settings
+            _buildSettingCard(
               icon: Icons.notifications_rounded,
               title: 'Notifications',
-              subtitle: 'Manage notification settings',
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Notifications settings coming soon'),
-                  ),
-                );
-              },
+              subtitle: _notificationsEnabled
+                  ? 'Notifications enabled'
+                  : 'Notifications disabled',
+              onTap: _showNotificationsDialog,
             ),
             const SizedBox(height: 12),
-            _buildSettingItem(
-              icon: Icons.security_rounded,
-              title: 'Security',
-              subtitle: 'Privacy & security settings',
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Security settings coming soon'),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 12),
-            _buildSettingItem(
+
+            // ✅ Help & Support
+            _buildSettingCard(
               icon: Icons.help_rounded,
               title: 'Help & Support',
-              subtitle: 'Get help and support',
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Help & Support coming soon'),
-                  ),
-                );
-              },
+              subtitle: 'Learn how to use the app',
+              onTap: _showHelpDialog,
             ),
             const SizedBox(height: 32),
-            // ✅ ปุ่ม Logout
+
+            // ✅ Logout Button
             SizedBox(
               width: double.infinity,
               height: 48,
@@ -136,13 +441,14 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
             ),
+            const SizedBox(height: 16),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSettingItem({
+  Widget _buildSettingCard({
     required IconData icon,
     required String title,
     required String subtitle,
@@ -153,15 +459,11 @@ class _SettingsPageState extends State<SettingsPage> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          border: Border.all(
+            color: Colors.white.withOpacity(0.1),
+          ),
         ),
         child: Row(
           children: [

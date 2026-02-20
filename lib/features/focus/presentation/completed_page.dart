@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:confetti/confetti.dart';
+import '../../../features/tasks/data/task_repository.dart';
 
 class CompletedPage extends StatefulWidget {
   final String taskTitle;
+  final int focusTimeMinutes;
+  final String taskId;
 
   const CompletedPage({
     Key? key,
     required this.taskTitle,
+    required this.focusTimeMinutes,
+    required this.taskId,
   }) : super(key: key);
 
   @override
@@ -15,13 +20,39 @@ class CompletedPage extends StatefulWidget {
 
 class _CompletedPageState extends State<CompletedPage> {
   late ConfettiController _confettiController;
+  late TaskRepository _repository;
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
+    _repository = TaskRepositoryImpl();
     _confettiController =
         ConfettiController(duration: const Duration(seconds: 3));
     _confettiController.play();
+    _saveCompletedTask();
+  }
+
+  // ✅ Save Completed Task to Firebase
+  Future<void> _saveCompletedTask() async {
+    setState(() => _isSaving = true);
+    try {
+      // Get task and complete it
+      final task = await _repository.getTaskById(widget.taskId);
+      if (task != null) {
+        await _repository.completeTask(task, widget.focusTimeMinutes);
+      }
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving task: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -53,7 +84,6 @@ class _CompletedPageState extends State<CompletedPage> {
                     Stack(
                       alignment: Alignment.center,
                       children: [
-                        // Background glow
                         Container(
                           width: 250,
                           height: 250,
@@ -69,7 +99,6 @@ class _CompletedPageState extends State<CompletedPage> {
                             ),
                           ),
                         ),
-                        // Checkmark circle
                         Container(
                           width: 180,
                           height: 180,
@@ -91,7 +120,6 @@ class _CompletedPageState extends State<CompletedPage> {
                             ),
                           ),
                         ),
-                        // Celebrating cat
                         Positioned(
                           bottom: 20,
                           child: Text(
@@ -102,7 +130,6 @@ class _CompletedPageState extends State<CompletedPage> {
                       ],
                     ),
                     const SizedBox(height: 40),
-                    // ✅ Message
                     const Text(
                       'Completed!',
                       style: TextStyle(
@@ -120,20 +147,30 @@ class _CompletedPageState extends State<CompletedPage> {
                       ),
                       textAlign: TextAlign.center,
                     ),
+                    const SizedBox(height: 12),
+                    // ✅ Show Focus Time
+                    Text(
+                      'Focus Time: ${widget.focusTimeMinutes} minutes',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white.withOpacity(0.8),
+                      ),
+                    ),
                     const SizedBox(height: 80),
-                    // ✅ Button - ✅ แก้ให้กลับไปหน้า Home
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: () {
-                            // ✅ กลับไปหน้า Home (Task List)
-                            Navigator.of(context).popUntil(
-                              (route) => route.settings.name == '/home' || 
-                                         route.isFirst,
-                            );
-                          },
+                          onPressed: _isSaving
+                              ? null
+                              : () {
+                                  Navigator.of(context).popUntil(
+                                    (route) =>
+                                        route.settings.name == '/home' ||
+                                        route.isFirst,
+                                  );
+                                },
                           style: ElevatedButton.styleFrom(
                             backgroundColor:
                                 Theme.of(context).primaryColor,
@@ -142,9 +179,9 @@ class _CompletedPageState extends State<CompletedPage> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: const Text(
-                            'Back to Tasks',
-                            style: TextStyle(
+                          child: Text(
+                            _isSaving ? 'Saving...' : 'Back to Tasks',
+                            style: const TextStyle(
                               color: Colors.black87,
                               fontWeight: FontWeight.w600,
                               fontSize: 16,
@@ -157,7 +194,6 @@ class _CompletedPageState extends State<CompletedPage> {
                   ],
                 ),
               ),
-              // ✅ Confetti
               Align(
                 alignment: Alignment.topCenter,
                 child: ConfettiWidget(
@@ -178,7 +214,6 @@ class _CompletedPageState extends State<CompletedPage> {
         currentIndex: 0,
         onTap: (index) {
           if (index == 1) {
-            // ✅ กดปุ่ม Home ก็กลับไปหน้า Home
             Navigator.of(context).popUntil(
               (route) => route.settings.name == '/home' || route.isFirst,
             );

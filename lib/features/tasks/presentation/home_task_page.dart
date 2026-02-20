@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../data/task_model.dart';
 import '../data/task_repository.dart';
 import 'add_task_page.dart';
@@ -16,26 +17,41 @@ class HomeTaskPage extends StatefulWidget {
 }
 
 class _HomeTaskPageState extends State<HomeTaskPage> {
-  int _selectedIndex = 1; // Default to Home tab
+  int _selectedIndex = 1;
   late TaskRepository _taskRepository;
   List<TaskModel> tasks = [];
   bool isLoading = false;
   String _selectedFilter = 'All Task';
 
   final categories = ['All Task', 'Work', 'Study', 'Personal', 'Health'];
-  static const Color cardColor = Color(0xFF2F2540);
 
   @override
   void initState() {
     super.initState();
-    _taskRepository = TaskRepositoryImpl();
-    _loadTasks();
+    _initializeRepository();
+  }
+
+  // ✅ Initialize Repository dengan userId
+  Future<void> _initializeRepository() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        _taskRepository = TaskRepositoryImpl(userId: user.uid);
+        await _loadTasks();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _loadTasks() async {
     setState(() => isLoading = true);
     try {
-      final loadedTasks = await _taskRepository.getAllTasks();
+      final loadedTasks = await _taskRepository.getAllActiveTasks();
       setState(() {
         tasks = loadedTasks;
         isLoading = false;
@@ -59,7 +75,7 @@ class _HomeTaskPageState extends State<HomeTaskPage> {
     try {
       List<TaskModel> filtered;
       if (category == 'All Task') {
-        filtered = await _taskRepository.getAllTasks();
+        filtered = await _taskRepository.getAllActiveTasks();
       } else {
         filtered = await _taskRepository.getTasksByCategory(category);
       }
@@ -89,7 +105,6 @@ class _HomeTaskPageState extends State<HomeTaskPage> {
         title: const Text(''),
         elevation: 0,
         actions: [
-          // ✅ Hamburger Menu
           IconButton(
             icon: const Icon(Icons.menu),
             onPressed: () {
@@ -106,7 +121,7 @@ class _HomeTaskPageState extends State<HomeTaskPage> {
       body: IndexedStack(
         index: _selectedIndex,
         children: [
-          const SizedBox(), // Focus page (empty for now)
+          const SizedBox(),
           _buildHomeView(),
           const ProfilePage(),
         ],
@@ -212,7 +227,6 @@ class _HomeTaskPageState extends State<HomeTaskPage> {
       ),
       child: Stack(
         children: [
-          // Wavy decoration background
           Positioned(
             top: -10,
             left: 0,
@@ -222,7 +236,6 @@ class _HomeTaskPageState extends State<HomeTaskPage> {
               painter: WavePainter(),
             ),
           ),
-          // Cat illustration
           Positioned(
             right: 20,
             bottom: 10,
@@ -231,7 +244,6 @@ class _HomeTaskPageState extends State<HomeTaskPage> {
               style: TextStyle(fontSize: 60),
             ),
           ),
-          // Buttons
           Positioned(
             left: 16,
             bottom: 16,
@@ -369,7 +381,6 @@ class _HomeTaskPageState extends State<HomeTaskPage> {
   }
 }
 
-// Wave painter for decoration
 class WavePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -387,7 +398,6 @@ class WavePainter extends CustomPainter {
 
     canvas.drawPath(path, paint);
 
-    // Draw decorative circles
     final circlePaint = Paint()
       ..color = Colors.white.withOpacity(0.3)
       ..style = PaintingStyle.fill;

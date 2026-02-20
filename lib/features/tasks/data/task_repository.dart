@@ -1,238 +1,282 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'task_model.dart';
 
 abstract class TaskRepository {
-  Future<List<TaskModel>> getAllTasks();
+  // Active Tasks (ยังไม่เสร็จ)
+  Future<List<TaskModel>> getAllActiveTasks();
+  Future<List<TaskModel>> getTasksByCategory(String category);
+  Future<List<TaskModel>> getTasksByPriority(Priority priority);
+  Future<List<TaskModel>> getPendingTasks();
+
+  // CRUD
   Future<TaskModel?> getTaskById(String id);
   Future<void> addTask(TaskModel task);
   Future<void> updateTask(TaskModel task);
   Future<void> deleteTask(String id);
-  Future<List<TaskModel>> getTasksByCategory(String category);
-  Future<List<TaskModel>> getTasksByPriority(Priority priority);
+
+  // Completed Tasks (เสร็จแล้ว)
   Future<List<TaskModel>> getCompletedTasks();
-  Future<List<TaskModel>> getPendingTasks();
-  Future<List<TaskModel>> getTasksSortedByDate();
-  Future<List<TaskModel>> getTasksSortedByPriority();
+  Future<void> completeTask(TaskModel task, int focusTimeSpent);
+
+  // Stats
   Future<int> getTotalTasksCount();
   Future<int> getCompletedTasksCount();
   Future<int> getPendingTasksCount();
   Future<Map<String, int>> getTasksCountByCategory();
-  Future<List<TaskModel>> searchTasks(String query);
-  Future<bool> checkDueTodayTasks();
-  Future<void> clearAllTasks();
+  Future<int> getTotalFocusTimeSpent();
+
 }
 
 class TaskRepositoryImpl implements TaskRepository {
   static final TaskRepositoryImpl _instance = TaskRepositoryImpl._internal();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  late String _userId;
 
-  final List<TaskModel> _tasks = [];
-
-  factory TaskRepositoryImpl() {
+  factory TaskRepositoryImpl({String? userId}) {
+    if (userId != null) {
+      _instance._userId = userId;
+    }
     return _instance;
   }
 
-  TaskRepositoryImpl._internal() {
-    _initializeSampleData();
+  TaskRepositoryImpl._internal();
+
+  void setUserId(String userId) {
+    _userId = userId;
   }
 
-  void _initializeSampleData() {
-    _tasks.addAll([
-      TaskModel(
-        id: '1',
-        title: 'Friday Job Assignment',
-        description: 'Complete the assignment for Friday class',
-        category: 'Work',
-        dueDate: DateTime(2024, 10, 25),
-        priority: Priority.high,
-        isCompleted: false,
-      ),
-      TaskModel(
-        id: '2',
-        title: 'Presentation',
-        description: 'Prepare presentation slides for the meeting',
-        category: 'Work',
-        dueDate: DateTime(2024, 10, 26),
-        priority: Priority.medium,
-        isCompleted: false,
-      ),
-      TaskModel(
-        id: '3',
-        title: 'Project Research',
-        description: 'Research project details and requirements',
-        category: 'Study',
-        dueDate: DateTime(2024, 10, 27),
-        priority: Priority.medium,
-        isCompleted: false,
-      ),
-      TaskModel(
-        id: '4',
-        title: 'Study for Final Exam',
-        description: 'Study for the final exam next month',
-        category: 'Study',
-        dueDate: DateTime(2024, 11, 15),
-        priority: Priority.high,
-        isCompleted: false,
-      ),
-      TaskModel(
-        id: '5',
-        title: 'Workout',
-        description: 'Go to the gym and workout',
-        category: 'Health',
-        dueDate: DateTime(2024, 10, 24),
-        priority: Priority.low,
-        isCompleted: true,
-      ),
-    ]);
-  }
+  String get _activeTasks => 'users/$_userId/tasks';
+  String get _completedTasks => 'users/$_userId/completedTasks';
 
+  // ✅ Get All Active Tasks (ไม่รวม Completed)
   @override
-  Future<List<TaskModel>> getAllTasks() async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    return List.from(_tasks);
+  Future<List<TaskModel>> getAllActiveTasks() async {
+    try {
+      final snapshot = await _firestore
+          .collection(_activeTasks)
+          .where('isCompleted', isEqualTo: false)
+          .get();
+      return snapshot.docs
+          .map((doc) => TaskModel.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      throw Exception('Error getting tasks: $e');
+    }
   }
 
   @override
   Future<TaskModel?> getTaskById(String id) async {
-    await Future.delayed(const Duration(milliseconds: 300));
     try {
-      return _tasks.firstWhere((task) => task.id == id);
+      final doc = await _firestore
+          .collection(_activeTasks)
+          .doc(id)
+          .get();
+      if (!doc.exists) return null;
+      return TaskModel.fromFirestore(doc);
     } catch (e) {
-      return null;
+      throw Exception('Error getting task: $e');
     }
   }
 
   @override
   Future<void> addTask(TaskModel task) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    _tasks.add(task);
+    try {
+      await _firestore
+          .collection(_activeTasks)
+          .doc(task.id)
+          .set(task.toFirestore());
+    } catch (e) {
+      throw Exception('Error adding task: $e');
+    }
   }
 
   @override
   Future<void> updateTask(TaskModel task) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    final index = _tasks.indexWhere((t) => t.id == task.id);
-    if (index != -1) {
-      _tasks[index] = task;
+    try {
+      await _firestore
+          .collection(_activeTasks)
+          .doc(task.id)
+          .update(task.toFirestore());
+    } catch (e) {
+      throw Exception('Error updating task: $e');
     }
   }
 
   @override
   Future<void> deleteTask(String id) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    _tasks.removeWhere((task) => task.id == id);
+    try {
+      await _firestore
+          .collection(_activeTasks)
+          .doc(id)
+          .delete();
+    } catch (e) {
+      throw Exception('Error deleting task: $e');
+    }
   }
 
   @override
   Future<List<TaskModel>> getTasksByCategory(String category) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    return _tasks.where((task) => task.category == category).toList();
+    try {
+      final snapshot = await _firestore
+          .collection(_activeTasks)
+          .where('category', isEqualTo: category)
+          .where('isCompleted', isEqualTo: false)
+          .get();
+      return snapshot.docs
+          .map((doc) => TaskModel.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      throw Exception('Error getting tasks: $e');
+    }
   }
 
   @override
   Future<List<TaskModel>> getTasksByPriority(Priority priority) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    return _tasks.where((task) => task.priority == priority).toList();
-  }
-
-  @override
-  Future<List<TaskModel>> getCompletedTasks() async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    return _tasks.where((task) => task.isCompleted).toList();
+    try {
+      final snapshot = await _firestore
+          .collection(_activeTasks)
+          .where('priority', isEqualTo: priority.label)
+          .where('isCompleted', isEqualTo: false)
+          .get();
+      return snapshot.docs
+          .map((doc) => TaskModel.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      throw Exception('Error getting tasks: $e');
+    }
   }
 
   @override
   Future<List<TaskModel>> getPendingTasks() async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    return _tasks.where((task) => !task.isCompleted).toList();
+    try {
+      final snapshot = await _firestore
+          .collection(_activeTasks)
+          .where('isCompleted', isEqualTo: false)
+          .get();
+      return snapshot.docs
+          .map((doc) => TaskModel.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      throw Exception('Error getting tasks: $e');
+    }
   }
 
+  // ✅ Complete Task - Move to Completed Collection
   @override
-  Future<List<TaskModel>> getTasksSortedByDate() async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    final sorted = _tasks.toList();
-    sorted.sort((a, b) {
-      if (a.dueDate == null || b.dueDate == null) return 0;
-      return a.dueDate!.compareTo(b.dueDate!);
-    });
+  Future<void> completeTask(TaskModel task, int focusTimeSpent) async {
+    try {
+      final completedTask = task.copyWith(
+        isCompleted: true,
+        completedAt: DateTime.now(),
+        focusTimeSpent: focusTimeSpent,
+      );
 
-    return sorted;
+      // Save to completedTasks collection
+      await _firestore
+          .collection(_completedTasks)
+          .doc(task.id)
+          .set(completedTask.toFirestore());
+
+      // Delete from activeTasks
+      await _firestore
+          .collection(_activeTasks)
+          .doc(task.id)
+          .delete();
+    } catch (e) {
+      throw Exception('Error completing task: $e');
+    }
   }
 
-
+  // ✅ Get Completed Tasks
   @override
-  Future<List<TaskModel>> getTasksSortedByPriority() async {
-    await Future.delayed(const Duration(milliseconds: 300));
-
-    final priorityOrder = {
-      Priority.high: 1,
-      Priority.medium: 2,
-      Priority.low: 3,
-    };
-
-    final sorted = _tasks.toList();
-
-    sorted.sort((a, b) {
-      return (priorityOrder[a.priority] ?? 4)
-          .compareTo(priorityOrder[b.priority] ?? 4);
-    });
-
-    return sorted;
+  Future<List<TaskModel>> getCompletedTasks() async {
+    try {
+      final snapshot = await _firestore
+          .collection(_completedTasks)
+          .orderBy('completedAt', descending: true)
+          .get();
+      return snapshot.docs
+          .map((doc) => TaskModel.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      throw Exception('Error getting completed tasks: $e');
+    }
   }
-
 
   @override
   Future<int> getTotalTasksCount() async {
-    await Future.delayed(const Duration(milliseconds: 200));
-    return _tasks.length;
+    try {
+      final snapshot = await _firestore
+          .collection(_activeTasks)
+          .where('isCompleted', isEqualTo: false)
+          .count()
+          .get();
+      return snapshot.count ?? 0;
+    } catch (e) {
+      return 0;
+    }
   }
 
   @override
   Future<int> getCompletedTasksCount() async {
-    await Future.delayed(const Duration(milliseconds: 200));
-    return _tasks.where((task) => task.isCompleted).length;
+    try {
+      final snapshot = await _firestore
+          .collection(_completedTasks)
+          .count()
+          .get();
+      return snapshot.count ?? 0;
+    } catch (e) {
+      return 0;
+    }
   }
 
   @override
   Future<int> getPendingTasksCount() async {
-    await Future.delayed(const Duration(milliseconds: 200));
-    return _tasks.where((task) => !task.isCompleted).length;
+    try {
+      final snapshot = await _firestore
+          .collection(_activeTasks)
+          .where('isCompleted', isEqualTo: false)
+          .count()
+          .get();
+      return snapshot.count ?? 0;
+    } catch (e) {
+      return 0;
+    }
   }
 
   @override
   Future<Map<String, int>> getTasksCountByCategory() async {
-    await Future.delayed(const Duration(milliseconds: 200));
-    final Map<String, int> counts = {};
-    for (var task in _tasks) {
-      counts[task.category] = (counts[task.category] ?? 0) + 1;
+    try {
+      final snapshot = await _firestore
+          .collection(_activeTasks)
+          .where('isCompleted', isEqualTo: false)
+          .get();
+      final Map<String, int> counts = {};
+      for (var doc in snapshot.docs) {
+        final task = TaskModel.fromFirestore(doc);
+        counts[task.category] = (counts[task.category] ?? 0) + 1;
+      }
+      return counts;
+    } catch (e) {
+      return {};
     }
-    return counts;
   }
 
+  // ✅ Get Total Focus Time Spent
   @override
-  Future<List<TaskModel>> searchTasks(String query) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    final lowerQuery = query.toLowerCase();
-    return _tasks.where((task) {
-      return task.title.toLowerCase().contains(lowerQuery) ||
-          task.description.toLowerCase().contains(lowerQuery) ||
-          task.category.toLowerCase().contains(lowerQuery);
-    }).toList();
-  }
-
-  @override
-  Future<bool> checkDueTodayTasks() async {
-    await Future.delayed(const Duration(milliseconds: 200));
-    final today = DateTime.now();
-    return _tasks.any((task) =>
-        task.dueDate != null &&
-        task.dueDate!.day == today.day &&
-        task.dueDate!.month == today.month &&
-        task.dueDate!.year == today.year &&
-        !task.isCompleted);
-  }
-
-  @override
-  Future<void> clearAllTasks() async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    _tasks.clear();
+  Future<int> getTotalFocusTimeSpent() async {
+    try {
+      final snapshot = await _firestore
+          .collection(_completedTasks)
+          .get();
+      int totalMinutes = 0;
+      for (var doc in snapshot.docs) {
+        final task = TaskModel.fromFirestore(doc);
+        totalMinutes += task.focusTimeSpent ?? 0;
+      }
+      return totalMinutes;
+    } catch (e) {
+      return 0;
+    }
   }
 }

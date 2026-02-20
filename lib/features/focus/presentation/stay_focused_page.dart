@@ -6,10 +6,12 @@ import 'completed_page.dart';
 class StayFocusedPage extends StatefulWidget {
   final String taskTitle;
   final int initialMinutes;
+  final String taskId;
 
   const StayFocusedPage({
     Key? key,
     required this.taskTitle,
+    required this.taskId,
     this.initialMinutes = 25,
   }) : super(key: key);
 
@@ -19,6 +21,7 @@ class StayFocusedPage extends StatefulWidget {
 
 class _StayFocusedPageState extends State<StayFocusedPage> {
   late int _remainingSeconds;
+  late int _totalFocusSeconds; // ✅ เก็บเวลา Focus ทั้งหมด
   late Timer _timer;
   bool _isPaused = false;
 
@@ -26,6 +29,7 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
   void initState() {
     super.initState();
     _remainingSeconds = widget.initialMinutes * 60;
+    _totalFocusSeconds = widget.initialMinutes * 60;
     _startTimer();
   }
 
@@ -85,7 +89,6 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
           child: SingleChildScrollView(
             child: Column(
               children: [
-                // ✅ Header dengan wavy design
                 Stack(
                   children: [
                     CustomPaint(
@@ -120,7 +123,6 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
                   ],
                 ),
                 const SizedBox(height: 40),
-                // ✅ Task Title
                 Text(
                   widget.taskTitle,
                   style: const TextStyle(
@@ -131,7 +133,6 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 60),
-                // ✅ Timer Circle
                 Container(
                   width: 200,
                   height: 200,
@@ -161,7 +162,6 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
                   ),
                 ),
                 const SizedBox(height: 40),
-                // ✅ Status
                 Text(
                   'Currently: ${_isPaused ? 'Paused' : 'Focus'}',
                   style: const TextStyle(
@@ -170,12 +170,10 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
                   ),
                 ),
                 const SizedBox(height: 60),
-                // ✅ Action Buttons
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Column(
                     children: [
-                      // ✅ First Row - Pause/Resume + Complete Task
                       Row(
                         children: [
                           Expanded(
@@ -207,11 +205,17 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
                             child: ElevatedButton(
                               onPressed: () {
                                 _timer.cancel();
+                                // ✅ Hitung เวลา Focus ที่ใช้
+                                final focusTimeUsed =
+                                    widget.initialMinutes -
+                                    (_remainingSeconds ~/ 60);
                                 Navigator.pushReplacement(
                                   context,
                                   MaterialPageRoute(
                                     builder: (context) => CompletedPage(
                                       taskTitle: widget.taskTitle,
+                                      focusTimeMinutes: focusTimeUsed,
+                                      taskId: widget.taskId,
                                     ),
                                   ),
                                 );
@@ -237,13 +241,17 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      // ✅ Skip to Break Button - เต็มความกว้าง
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed: () {
                             _timer.cancel();
-                            _navigateToBreak();
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const TakeABreakPage(),
+                              ),
+                            );
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.blue.shade600,
@@ -318,7 +326,6 @@ class WaveHeaderPainter extends CustomPainter {
 
     canvas.drawPath(path, paint);
 
-    // Sleeping cat
     canvas.drawCircle(
       Offset(size.width * 0.85, 35),
       8,

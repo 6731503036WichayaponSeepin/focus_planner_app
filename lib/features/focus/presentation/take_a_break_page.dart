@@ -40,15 +40,19 @@ class _TakeABreakPageState extends State<TakeABreakPage> {
 
   void _backToFocus() {
     _timer.cancel();
+
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => const StayFocusedPage(
+        builder: (context) => StayFocusedPage(
           taskTitle: 'Finish UI Design',
+          initialMinutes: 25,
+          taskId: 'temp_id',
         ),
       ),
     );
   }
+
 
   String _formatTime(int seconds) {
     final minutes = (seconds ~/ 60).toString().padLeft(2, '0');
