@@ -36,61 +36,26 @@ class TaskCardNew extends StatelessWidget {
             ),
           ],
         ),
+
+        /// 🔥 ต้องมี child ตรงนี้
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header row with category, title, and checkbox
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Category badge
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _getCategoryColor(task.category),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    task.category,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Title
-                Expanded(
-                  child: Text(
-                    task.title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                      decoration: task.isCompleted
-                          ? TextDecoration.lineThrough
-                          : TextDecoration.none,
-                    ),
-                  ),
-                ),
-                // Checkbox
-                Checkbox(
-                  value: task.isCompleted,
-                  onChanged: (value) {
-                    // Handle checkbox change
-                  },
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            // Description
+
+            /// Title
             Text(
-              task.description,
+              task.title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 6),
+
+            /// Description (แก้ nullable)
+            Text(
+              task.description ?? '',
               style: const TextStyle(
                 fontSize: 13,
                 color: Colors.grey,
@@ -98,8 +63,10 @@ class TaskCardNew extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
+
             const SizedBox(height: 12),
-            // Footer row with date and priority
+
+            /// Footer row
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -113,7 +80,7 @@ class TaskCardNew extends StatelessWidget {
                     const SizedBox(width: 6),
                     Text(
                       task.dueDate != null
-                          ? '${task.dueDate!.day.toString().padLeft(2, '0')}${task.dueDate!.month.toString().padLeft(2, '0')} ES, ${task.dueDate!.year}'
+                          ? '${task.dueDate!.day.toString().padLeft(2, '0')}/${task.dueDate!.month.toString().padLeft(2, '0')}/${task.dueDate!.year}'
                           : 'No date',
                       style: const TextStyle(
                         fontSize: 12,
@@ -122,10 +89,11 @@ class TaskCardNew extends StatelessWidget {
                     ),
                   ],
                 ),
-                // Priority badge
+
+                /// Priority badge
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: task.priority.color,
                     borderRadius: BorderRadius.circular(12),
@@ -145,20 +113,5 @@ class TaskCardNew extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Color _getCategoryColor(String category) {
-    switch (category.toLowerCase()) {
-      case 'work':
-        return const Color(0xFFFFC966);
-      case 'study':
-        return const Color(0xFFADBDE6);
-      case 'personal':
-        return const Color(0xFF92C4B7);
-      case 'health':
-        return const Color(0xFFE8A8A8);
-      default:
-        return const Color(0xFF999999);
-    }
   }
 }

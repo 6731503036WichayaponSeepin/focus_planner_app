@@ -20,7 +20,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   late TaskModel _currentTask;
   late TaskRepository _repository;
   bool _isLoading = false;
-  late int _focusTime; // ✅ เปลี่ยนจาก int = 25
+  late int _focusTime;
   TimeOfDay _reminderTime = TimeOfDay.now();
 
   @override
@@ -31,16 +31,15 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     _loadFocusTimeFromSettings();
   }
 
-  // ✅ Load Focus Time from Settings
   Future<void> _loadFocusTimeFromSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       setState(() {
-        _focusTime = prefs.getInt('focusTime') ?? 25; // Default 25 mins
+        _focusTime = prefs.getInt('focusTime') ?? 25;
       });
     } catch (e) {
       setState(() {
-        _focusTime = 25; // Default if error
+        _focusTime = 25;
       });
     }
   }
@@ -52,13 +51,17 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Colors.purple.shade800, Colors.purple.shade600],
+            colors: isDarkMode
+                ? [Colors.purple.shade800, Colors.purple.shade600]
+                : [Colors.orange.shade400, Colors.orange.shade200],
           ),
         ),
         child: SafeArea(
@@ -71,11 +74,13 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                     Container(
                       height: 120,
                       decoration: BoxDecoration(
-                        color: Colors.purple.shade700,
+                        color: isDarkMode
+                            ? Colors.purple.shade700
+                            : Colors.orange.shade300,
                       ),
                       child: CustomPaint(
                         size: const Size(double.infinity, 120),
-                        painter: WaveHeaderPainter(),
+                        painter: WaveHeaderPainter(isDarkMode: isDarkMode),
                       ),
                     ),
                     Positioned(
@@ -123,6 +128,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                       _buildDetailCard(
                         icon: Icons.description,
                         title: _currentTask.title,
+                        isDarkMode: isDarkMode,
                       ),
                       const SizedBox(height: 12),
 
@@ -131,6 +137,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                         icon: Icons.category,
                         title: _currentTask.category,
                         badgeColor: _getCategoryColor(_currentTask.category),
+                        isDarkMode: isDarkMode,
                       ),
                       const SizedBox(height: 12),
 
@@ -138,15 +145,17 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                       _buildDetailCard(
                         icon: Icons.calendar_today,
                         title: _formatDate(_currentTask.dueDate),
+                        isDarkMode: isDarkMode,
                       ),
                       const SizedBox(height: 12),
 
-                      // ✅ Focus Time - อ่านจาก Settings
+                      // ✅ Focus Time
                       _buildDetailCardWithValue(
                         icon: Icons.timer_outlined,
                         title: 'Focus Time',
                         value: '$_focusTime mins',
                         onTap: _showFocusTimePicker,
+                        isDarkMode: isDarkMode,
                       ),
                       const SizedBox(height: 12),
 
@@ -156,6 +165,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                         title: 'Reminder',
                         value: _reminderTime.format(context),
                         onTap: _showReminderTimePicker,
+                        isDarkMode: isDarkMode,
                       ),
                       const SizedBox(height: 12),
 
@@ -163,25 +173,30 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                       _buildDetailCard(
                         icon: Icons.priority_high,
                         title: 'Priority: ${_currentTask.priority.label}',
+                        isDarkMode: isDarkMode,
                       ),
                       const SizedBox(height: 24),
 
                       // ✅ Note Section
-                      const Text(
+                      Text(
                         'Note',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: isDarkMode ? Colors.white : Colors.black87,
                         ),
                       ),
                       const SizedBox(height: 12),
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.08),
+                          color: isDarkMode
+                              ? Colors.white.withOpacity(0.08)
+                              : Colors.black.withOpacity(0.05),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.2),
+                            color: isDarkMode
+                                ? Colors.white.withOpacity(0.2)
+                                : Colors.black.withOpacity(0.1),
                           ),
                           borderRadius: BorderRadius.circular(14),
                         ),
@@ -190,15 +205,19 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                           children: [
                             Icon(
                               Icons.note,
-                              color: Colors.white.withOpacity(0.7),
+                              color: isDarkMode
+                                  ? Colors.white.withOpacity(0.7)
+                                  : Colors.black.withOpacity(0.5),
                               size: 24,
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
                                 _currentTask.description,
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black87,
                                   fontSize: 14,
                                   height: 1.5,
                                 ),
@@ -216,20 +235,25 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                             child: ElevatedButton(
                               onPressed: () => Navigator.pop(context),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor:
-                                    Colors.white.withOpacity(0.15),
+                                backgroundColor: isDarkMode
+                                    ? Colors.white.withOpacity(0.15)
+                                    : Colors.black.withOpacity(0.1),
                                 side: BorderSide(
-                                  color: Colors.white.withOpacity(0.3),
+                                  color: isDarkMode
+                                      ? Colors.white.withOpacity(0.3)
+                                      : Colors.black.withOpacity(0.2),
                                 ),
                                 padding: const EdgeInsets.symmetric(vertical: 12),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
-                              child: const Text(
+                              child: Text(
                                 'Cancel',
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black87,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -251,8 +275,10 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                                 _isLoading
                                     ? 'Starting...'
                                     : 'Start Focus Timer',
-                                style: const TextStyle(
-                                  color: Colors.black87,
+                                style: TextStyle(
+                                  color: isDarkMode
+                                      ? Colors.black87
+                                      : Colors.white,
                                   fontWeight: FontWeight.w600,
                                   fontSize: 16,
                                 ),
@@ -273,17 +299,21 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     );
   }
 
-  // ✅ Detail Card (Simple)
   Widget _buildDetailCard({
     required IconData icon,
     required String title,
+    required bool isDarkMode,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
+        color: isDarkMode
+            ? Colors.white.withOpacity(0.08)
+            : Colors.black.withOpacity(0.05),
         border: Border.all(
-          color: Colors.white.withOpacity(0.2),
+          color: isDarkMode
+              ? Colors.white.withOpacity(0.2)
+              : Colors.black.withOpacity(0.1),
         ),
         borderRadius: BorderRadius.circular(14),
       ),
@@ -291,15 +321,17 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         children: [
           Icon(
             icon,
-            color: Colors.white.withOpacity(0.8),
+            color: isDarkMode
+                ? Colors.white.withOpacity(0.8)
+                : Colors.black.withOpacity(0.6),
             size: 20,
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               title,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black87,
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
               ),
@@ -310,18 +342,22 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     );
   }
 
-  // ✅ Detail Card with Badge
   Widget _buildDetailCardWithBadge({
     required IconData icon,
     required String title,
     required Color badgeColor,
+    required bool isDarkMode,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
+        color: isDarkMode
+            ? Colors.white.withOpacity(0.08)
+            : Colors.black.withOpacity(0.05),
         border: Border.all(
-          color: Colors.white.withOpacity(0.2),
+          color: isDarkMode
+              ? Colors.white.withOpacity(0.2)
+              : Colors.black.withOpacity(0.1),
         ),
         borderRadius: BorderRadius.circular(14),
       ),
@@ -329,7 +365,9 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         children: [
           Icon(
             icon,
-            color: Colors.white.withOpacity(0.8),
+            color: isDarkMode
+                ? Colors.white.withOpacity(0.8)
+                : Colors.black.withOpacity(0.6),
             size: 20,
           ),
           const SizedBox(width: 12),
@@ -339,8 +377,8 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black87,
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
@@ -372,21 +410,25 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     );
   }
 
-  // ✅ Detail Card with Value
   Widget _buildDetailCardWithValue({
     required IconData icon,
     required String title,
     required String value,
     required VoidCallback onTap,
+    required bool isDarkMode,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.08),
+          color: isDarkMode
+              ? Colors.white.withOpacity(0.08)
+              : Colors.black.withOpacity(0.05),
           border: Border.all(
-            color: Colors.white.withOpacity(0.2),
+            color: isDarkMode
+                ? Colors.white.withOpacity(0.2)
+                : Colors.black.withOpacity(0.1),
           ),
           borderRadius: BorderRadius.circular(14),
         ),
@@ -394,15 +436,17 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           children: [
             Icon(
               icon,
-              color: Colors.white.withOpacity(0.8),
+              color: isDarkMode
+                  ? Colors.white.withOpacity(0.8)
+                  : Colors.black.withOpacity(0.6),
               size: 20,
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black87,
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                 ),
@@ -411,7 +455,9 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
             Text(
               value,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
+                color: isDarkMode
+                    ? Colors.white.withOpacity(0.7)
+                    : Colors.black.withOpacity(0.6),
                 fontSize: 14,
               ),
             ),
@@ -456,7 +502,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     }
   }
 
-  // ✅ Start Focus Timer - นำทางไป StayFocusedPage พร้อมเวลาจาก Settings
   void _startFocusTimer() {
     setState(() => _isLoading = true);
 
@@ -467,7 +512,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           MaterialPageRoute(
             builder: (context) => StayFocusedPage(
               taskTitle: _currentTask.title,
-              initialMinutes: _focusTime, // ✅ ใช้เวลาจาก Settings
+              initialMinutes: _focusTime,
               taskId: _currentTask.id,
             ),
           ),
@@ -494,6 +539,10 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
 // Wave Header Painter
 class WaveHeaderPainter extends CustomPainter {
+  final bool isDarkMode;
+
+  WaveHeaderPainter({required this.isDarkMode});
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
@@ -510,7 +559,6 @@ class WaveHeaderPainter extends CustomPainter {
 
     canvas.drawPath(path, paint);
 
-    // Draw decorative circles
     final circlePaint = Paint()
       ..color = Colors.black.withOpacity(0.3)
       ..style = PaintingStyle.fill;

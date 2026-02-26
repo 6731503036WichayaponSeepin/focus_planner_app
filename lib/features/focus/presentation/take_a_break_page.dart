@@ -40,19 +40,16 @@ class _TakeABreakPageState extends State<TakeABreakPage> {
 
   void _backToFocus() {
     _timer.cancel();
-
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => StayFocusedPage(
+        builder: (context) => const StayFocusedPage(
           taskTitle: 'Finish UI Design',
-          initialMinutes: 25,
-          taskId: 'temp_id',
+          taskId: 'task123',
         ),
       ),
     );
   }
-
 
   String _formatTime(int seconds) {
     final minutes = (seconds ~/ 60).toString().padLeft(2, '0');
@@ -68,13 +65,17 @@ class _TakeABreakPageState extends State<TakeABreakPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Colors.purple.shade800, Colors.purple.shade600],
+            colors: isDarkMode
+                ? [Colors.purple.shade800, Colors.purple.shade600]
+                : [Colors.orange.shade400, Colors.orange.shade200],
           ),
         ),
         child: SafeArea(
@@ -86,7 +87,7 @@ class _TakeABreakPageState extends State<TakeABreakPage> {
                   children: [
                     CustomPaint(
                       size: const Size(double.infinity, 100),
-                      painter: WaveHeaderPainter(),
+                      painter: WaveHeaderPainter(isDarkMode: isDarkMode),
                     ),
                     Positioned(
                       top: 16,
@@ -109,7 +110,9 @@ class _TakeABreakPageState extends State<TakeABreakPage> {
                   height: 150,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.1),
+                    color: isDarkMode
+                        ? Colors.white.withOpacity(0.1)
+                        : Colors.black.withOpacity(0.05),
                   ),
                   child: Center(
                     child: Text(
@@ -150,11 +153,11 @@ class _TakeABreakPageState extends State<TakeABreakPage> {
                 ),
                 const SizedBox(height: 40),
                 // ✅ Message
-                const Text(
+                Text(
                   'Rest Your Eyes',
                   style: TextStyle(
                     fontSize: 18,
-                    color: Colors.white,
+                    color: isDarkMode ? Colors.white : Colors.black87,
                   ),
                 ),
                 const SizedBox(height: 60),
@@ -170,20 +173,23 @@ class _TakeABreakPageState extends State<TakeABreakPage> {
                             _backToFocus();
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor:
-                                Colors.white.withOpacity(0.15),
+                            backgroundColor: isDarkMode
+                                ? Colors.white.withOpacity(0.15)
+                                : Colors.black.withOpacity(0.1),
                             side: BorderSide(
-                              color: Colors.white.withOpacity(0.3),
+                              color: isDarkMode
+                                  ? Colors.white.withOpacity(0.3)
+                                  : Colors.black.withOpacity(0.2),
                             ),
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: const Text(
+                          child: Text(
                             'Skip',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: isDarkMode ? Colors.white : Colors.black87,
                               fontWeight: FontWeight.w600,
                               fontSize: 16,
                             ),
@@ -205,10 +211,12 @@ class _TakeABreakPageState extends State<TakeABreakPage> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: const Text(
+                          child: Text(
                             'Give Up',
                             style: TextStyle(
-                              color: Colors.black87,
+                              color: isDarkMode
+                                  ? Colors.black87
+                                  : Colors.white,
                               fontWeight: FontWeight.w600,
                               fontSize: 16,
                             ),
@@ -235,7 +243,7 @@ class _TakeABreakPageState extends State<TakeABreakPage> {
         },
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.flag),
+            icon: Icon(Icons.track_changes),
             label: 'Focus',
           ),
           BottomNavigationBarItem(
@@ -253,6 +261,10 @@ class _TakeABreakPageState extends State<TakeABreakPage> {
 }
 
 class WaveHeaderPainter extends CustomPainter {
+  final bool isDarkMode;
+
+  WaveHeaderPainter({required this.isDarkMode});
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()

@@ -193,7 +193,7 @@ class _HomeTaskPageState extends State<HomeTaskPage> {
             style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: Color.fromARGB(255, 231, 113, 16),
             ),
           ),
           const SizedBox(height: 8),
@@ -201,7 +201,7 @@ class _HomeTaskPageState extends State<HomeTaskPage> {
             'Today, ${_getTodayDate()}',
             style: const TextStyle(
               fontSize: 14,
-              color: Colors.white70,
+              color: Color.fromARGB(179, 233, 141, 36),
             ),
           ),
           const SizedBox(height: 20),
@@ -215,7 +215,7 @@ class _HomeTaskPageState extends State<HomeTaskPage> {
     return Container(
       height: 120,
       decoration: BoxDecoration(
-        color: const Color(0xFFE8E8E8),
+        color: const Color.fromARGB(255, 209, 207, 207),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
@@ -241,7 +241,7 @@ class _HomeTaskPageState extends State<HomeTaskPage> {
             bottom: 10,
             child: Text(
               '🐱',
-              style: TextStyle(fontSize: 60),
+              style: TextStyle(fontSize: 90),
             ),
           ),
           Positioned(

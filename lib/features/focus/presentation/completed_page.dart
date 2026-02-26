@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:confetti/confetti.dart';
 import '../../../features/tasks/data/task_repository.dart';
 
@@ -26,30 +27,35 @@ class _CompletedPageState extends State<CompletedPage> {
   @override
   void initState() {
     super.initState();
-    _repository = TaskRepositoryImpl();
+    // ✅ Initialize Repository with userId
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      _repository = TaskRepositoryImpl(userId: user.uid);
+    }
     _confettiController =
         ConfettiController(duration: const Duration(seconds: 3));
     _confettiController.play();
     _saveCompletedTask();
   }
 
-  // ✅ Save Completed Task to Firebase
   Future<void> _saveCompletedTask() async {
     setState(() => _isSaving = true);
     try {
-      // Get task and complete it
       final task = await _repository.getTaskById(widget.taskId);
       if (task != null) {
         await _repository.completeTask(task, widget.focusTimeMinutes);
-      }
-      if (mounted) {
-        setState(() => _isSaving = false);
+        if (mounted) {
+          setState(() => _isSaving = false);
+        }
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving task: $e')),
+          SnackBar(
+            content: Text('Error saving task: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -63,13 +69,17 @@ class _CompletedPageState extends State<CompletedPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Colors.purple.shade800, Colors.purple.shade600],
+            colors: isDarkMode
+                ? [Colors.purple.shade800, Colors.purple.shade600]
+                : [Colors.orange.shade400, Colors.orange.shade200],
           ),
         ),
         child: SafeArea(
@@ -148,7 +158,6 @@ class _CompletedPageState extends State<CompletedPage> {
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 12),
-                    // ✅ Show Focus Time
                     Text(
                       'Focus Time: ${widget.focusTimeMinutes} minutes',
                       style: TextStyle(
@@ -165,9 +174,10 @@ class _CompletedPageState extends State<CompletedPage> {
                           onPressed: _isSaving
                               ? null
                               : () {
+                                  // ✅ Navigate back to Home
                                   Navigator.of(context).popUntil(
                                     (route) =>
-                                        route.settings.name == '/home' ||
+                                        route.settings.name == '/' ||
                                         route.isFirst,
                                   );
                                 },
@@ -181,8 +191,10 @@ class _CompletedPageState extends State<CompletedPage> {
                           ),
                           child: Text(
                             _isSaving ? 'Saving...' : 'Back to Tasks',
-                            style: const TextStyle(
-                              color: Colors.black87,
+                            style: TextStyle(
+                              color: isDarkMode
+                                  ? Colors.black87
+                                  : Colors.white,
                               fontWeight: FontWeight.w600,
                               fontSize: 16,
                             ),
@@ -215,17 +227,17 @@ class _CompletedPageState extends State<CompletedPage> {
         onTap: (index) {
           if (index == 1) {
             Navigator.of(context).popUntil(
-              (route) => route.settings.name == '/home' || route.isFirst,
+              (route) => route.isFirst,
             );
           } else if (index == 2) {
             Navigator.of(context).popUntil(
-              (route) => route.settings.name == '/profile' || route.isFirst,
+              (route) => route.isFirst,
             );
           }
         },
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.flag),
+            icon: Icon(Icons.track_changes),
             label: 'Focus',
           ),
           BottomNavigationBarItem(

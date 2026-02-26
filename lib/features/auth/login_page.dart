@@ -33,7 +33,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   String? _validatePassword(String? v) {
-    if (v == null || v.length < 6) return 'รหัสผ่านอย่าง���้อย 6 ตัวอักษร';
+    if (v == null || v.length < 6) return 'รหัสผ่านอย่างน้อย 6 ตัวอักษร';
     return null;
   }
 

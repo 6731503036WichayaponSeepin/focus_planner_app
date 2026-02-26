@@ -21,7 +21,7 @@ class StayFocusedPage extends StatefulWidget {
 
 class _StayFocusedPageState extends State<StayFocusedPage> {
   late int _remainingSeconds;
-  late int _totalFocusSeconds; // ✅ เก็บเวลา Focus ทั้งหมด
+  late int _totalFocusSeconds;
   late Timer _timer;
   bool _isPaused = false;
 
@@ -76,24 +76,29 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Colors.purple.shade800, Colors.purple.shade600],
+            colors: isDarkMode
+                ? [Colors.purple.shade800, Colors.purple.shade600]
+                : [Colors.orange.shade400, Colors.orange.shade200],
           ),
         ),
         child: SafeArea(
           child: SingleChildScrollView(
             child: Column(
               children: [
+                // ✅ Header dengan wavy design
                 Stack(
                   children: [
                     CustomPaint(
                       size: const Size(double.infinity, 120),
-                      painter: WaveHeaderPainter(),
+                      painter: WaveHeaderPainter(isDarkMode: isDarkMode),
                     ),
                     Positioned(
                       top: 16,
@@ -123,16 +128,18 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
                   ],
                 ),
                 const SizedBox(height: 40),
+                // ✅ Task Title
                 Text(
                   widget.taskTitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: isDarkMode ? Colors.white : Colors.black87,
                   ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 60),
+                // ✅ Timer Circle
                 Container(
                   width: 200,
                   height: 200,
@@ -162,28 +169,34 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
                   ),
                 ),
                 const SizedBox(height: 40),
+                // ✅ Status
                 Text(
                   'Currently: ${_isPaused ? 'Paused' : 'Focus'}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
-                    color: Colors.white,
+                    color: isDarkMode ? Colors.white : Colors.black87,
                   ),
                 ),
                 const SizedBox(height: 60),
+                // ✅ Action Buttons
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Column(
                     children: [
+                      // ✅ First Row - Pause/Resume + Complete Task
                       Row(
                         children: [
                           Expanded(
                             child: ElevatedButton(
                               onPressed: _pauseTimer,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor:
-                                    Colors.white.withOpacity(0.15),
+                                backgroundColor: isDarkMode
+                                    ? Colors.white.withOpacity(0.15)
+                                    : Colors.black.withOpacity(0.1),
                                 side: BorderSide(
-                                  color: Colors.white.withOpacity(0.3),
+                                  color: isDarkMode
+                                      ? Colors.white.withOpacity(0.3)
+                                      : Colors.black.withOpacity(0.2),
                                 ),
                                 padding: const EdgeInsets.symmetric(vertical: 12),
                                 shape: RoundedRectangleBorder(
@@ -192,8 +205,8 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
                               ),
                               child: Text(
                                 _isPaused ? 'Resume' : 'Pause',
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white : Colors.black87,
                                   fontWeight: FontWeight.w600,
                                   fontSize: 16,
                                 ),
@@ -205,9 +218,7 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
                             child: ElevatedButton(
                               onPressed: () {
                                 _timer.cancel();
-                                // ✅ Hitung เวลา Focus ที่ใช้
-                                final focusTimeUsed =
-                                    widget.initialMinutes -
+                                final focusTimeUsed = widget.initialMinutes -
                                     (_remainingSeconds ~/ 60);
                                 Navigator.pushReplacement(
                                   context,
@@ -228,10 +239,12 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
-                              child: const Text(
+                              child: Text(
                                 'Complete Task',
                                 style: TextStyle(
-                                  color: Colors.black87,
+                                  color: isDarkMode
+                                      ? Colors.black87
+                                      : Colors.white,
                                   fontWeight: FontWeight.w600,
                                   fontSize: 16,
                                 ),
@@ -241,6 +254,7 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
                         ],
                       ),
                       const SizedBox(height: 12),
+                      // ✅ Skip to Break Button
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
@@ -292,9 +306,9 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
         },
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.flag),
-            label: 'Focus',
-          ),
+          icon: Icon(Icons.track_changes),
+          label: 'Focus',
+        ),
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
             label: 'Home',
@@ -310,6 +324,10 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
 }
 
 class WaveHeaderPainter extends CustomPainter {
+  final bool isDarkMode;
+
+  WaveHeaderPainter({required this.isDarkMode});
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
