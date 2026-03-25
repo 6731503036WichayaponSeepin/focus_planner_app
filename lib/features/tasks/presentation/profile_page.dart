@@ -5,6 +5,7 @@ import '../data/task_repository.dart';
 import '../data/task_model.dart';
 import 'package:intl/intl.dart';
 import '../../../core/services/level_service.dart';
+import '../presentation/deleted_tasks_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({Key? key}) : super(key: key);
@@ -499,12 +500,87 @@ class _ProfilePageState extends State<ProfilePage>
                   const SizedBox(height: 20),
                   _buildProfileCard(currentUser),
                   const SizedBox(height: 20),
+                  // ✅ Trash Button
+                  _buildTrashButton(isDarkMode),
+                  const SizedBox(height: 20),
                   _buildStatsSection(isDarkMode),
                   const SizedBox(height: 20),
                   _buildCompletedTasksSection(isDarkMode),
                 ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ✅ Trash Button (ปรับสีเหมือน Profile Card)
+  Widget _buildTrashButton(bool isDarkMode) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const DeletedTasksPage(),
+            ),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.08),  // ✅ เปลี่ยน
+            border: Border.all(
+              color: Colors.white.withOpacity(0.2),  // ✅ เปลี่ยน
+            ),
+            borderRadius: BorderRadius.circular(16),  // ✅ เปลี่ยน
+          ),
+          child: Row(
+            children: [
+              // ✅ Icon Container
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.1),  // ✅ เปลี่ยน
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.delete_outline,
+                  color: Colors.red,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Trash',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'View deleted tasks',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white60,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: Colors.white54,
+              ),
+            ],
           ),
         ),
       ),

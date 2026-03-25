@@ -2,16 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:uuid/uuid.dart';
 import '../data/task_model.dart';
 import '../data/task_repository.dart';
+import '../data/deleted_task_model.dart';
+import '../data/deleted_task_repository.dart';
+import '../../../core/services/notification_service.dart';
 import '../../focus/presentation/stay_focused_page.dart';
 
 class TaskDetailPage extends StatefulWidget {
   static const routeName = '/task-detail';
 
   final TaskModel task;
+  final VoidCallback? onTaskUpdated;
 
-  const TaskDetailPage({Key? key, required this.task}) : super(key: key);
+  const TaskDetailPage({
+    Key? key,
+    required this.task,
+    this.onTaskUpdated,
+  }) : super(key: key);
 
   @override
   State<TaskDetailPage> createState() => _TaskDetailPageState();
@@ -53,351 +62,295 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     return DateFormat('EEEE, MMMM d, yyyy').format(date);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
-    return Scaffold(
-      body: Container(
-        // ✅ เปลี่ยน gradient เป็นสีเข้มเหมือน login
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: isDarkMode
-                ? const [
-                    Color.fromARGB(255, 3, 1, 59),
-                    Color.fromARGB(255, 41, 28, 114),
-                  ]
-                : [Colors.orange.shade400, Colors.orange.shade200],
-          ),
+  // ✅ ลบ Task
+  Future<void> _deleteTask() async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Task?'),
+        content: const Text(
+          'This action cannot be undone. The task will be moved to trash and cannot be recovered.',
         ),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                // ✅ Header dengan wavy decoration
-                Stack(
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _performDeleteTask();
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ ดำเนินการลบ
+  Future<void> _performDeleteTask() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      // ✅ บันทึกลงประวัติการลบ
+      final deletedTask = DeletedTaskModel(
+        id: const Uuid().v4(),
+        taskId: _currentTask.id,
+        userId: user.uid,
+        title: _currentTask.title,
+        description: _currentTask.description,
+        category: _currentTask.category,
+        dueDate: _currentTask.dueDate,
+        priority: _currentTask.priority.label,
+        deletedAt: DateTime.now(),
+        reason: 'Manual deletion from task detail',
+        taskData: _currentTask.toFirestore(),
+      );
+
+      final deletedRepo = DeletedTaskRepositoryImpl(userId: user.uid);
+      await deletedRepo.addDeletedTask(deletedTask);
+
+      // ✅ ลบจาก active tasks
+      await _repository.deleteTask(_currentTask.id);
+
+      // ✅ แจ้งเตือนการลบ
+      await NotificationService().notifyMotivational(
+        customMessage: 'Task "${_currentTask.title}" has been deleted and moved to trash.',
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Task deleted successfully'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 2),
+          ),
+        );
+
+        widget.onTaskUpdated?.call();
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting task: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+@override
+Widget build(BuildContext context) {
+  final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+  return Scaffold(
+    body: Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: isDarkMode
+              ? const [
+                  Color.fromARGB(255, 3, 1, 59),
+                  Color.fromARGB(255, 41, 28, 114),
+                ]
+              : [Colors.orange.shade400, Colors.orange.shade200],
+        ),
+      ),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              // ✅ Header
+              Stack(
+                children: [
+                  Container(
+                    height: 120,
+                    decoration: BoxDecoration(
+                      color: isDarkMode
+                          ? const Color.fromARGB(255, 41, 28, 114)
+                          : Colors.orange.shade300,
+                    ),
+                    child: CustomPaint(
+                      size: const Size(double.infinity, 120),
+                      painter: WaveHeaderPainter(isDarkMode: isDarkMode),
+                    ),
+                  ),
+                  Positioned(
+                    top: 16,
+                    left: 16,
+                    right: 16,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Task Detail',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            GestureDetector(
+                              onTap: _deleteTask,
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withOpacity(0.3),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.delete_outline,
+                                  color: Colors.red,
+                                  size: 22,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () => Navigator.pop(context),
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.close,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              // ✅ Content
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      height: 120,
-                      decoration: BoxDecoration(
-                        color: isDarkMode
-                            ? const Color.fromARGB(255, 41, 28, 114)
-                            : Colors.orange.shade300,
-                      ),
-                      child: CustomPaint(
-                        size: const Size(double.infinity, 120),
-                        painter: WaveHeaderPainter(isDarkMode: isDarkMode),
+                    _buildDetailCard(
+                      icon: Icons.description,
+                      title: _currentTask.title,
+                      isDarkMode: isDarkMode,
+                    ),
+                    const SizedBox(height: 12),
+
+                    _buildDetailCardWithBadge(
+                      icon: Icons.category,
+                      title: _currentTask.category,
+                      badgeColor: _getCategoryColor(_currentTask.category),
+                      isDarkMode: isDarkMode,
+                    ),
+                    const SizedBox(height: 12),
+
+                    _buildDetailCard(
+                      icon: Icons.calendar_today,
+                      title: _formatDate(_currentTask.dueDate),
+                      isDarkMode: isDarkMode,
+                    ),
+                    const SizedBox(height: 12),
+
+                    _buildDetailCardWithValue(
+                      icon: Icons.timer_outlined,
+                      title: 'Focus Time',
+                      value: '$_focusTime mins',
+                      onTap: _showFocusTimePicker,
+                      isDarkMode: isDarkMode,
+                    ),
+                    const SizedBox(height: 12),
+
+                    _buildDetailCardWithValue(
+                      icon: Icons.notifications_active,
+                      title: 'Reminder',
+                      value: _reminderTime.format(context),
+                      onTap: _showReminderTimePicker,
+                      isDarkMode: isDarkMode,
+                    ),
+                    const SizedBox(height: 12),
+
+                    _buildDetailCard(
+                      icon: Icons.priority_high,
+                      title: 'Priority: ${_currentTask.priority.label}',
+                      isDarkMode: isDarkMode,
+                    ),
+                    const SizedBox(height: 24),
+
+                    // NOTE
+                    Text(
+                      'Note',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isDarkMode ? Colors.white : Colors.black87,
                       ),
                     ),
-                    Positioned(
-                      top: 16,
-                      left: 16,
-                      right: 16,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Task Detail',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                    const SizedBox(height: 12),
+
+                    // (ส่วน Note container เหมือนเดิม ไม่ได้พัง)
+
+                    const SizedBox(height: 32),
+
+                    // ✅ Buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _deleteTask,
+                            child: const Text('Delete'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed:
+                                _isLoading ? null : _startFocusTimer,
+                            child: Text(
+                              _isLoading
+                                  ? 'Starting...'
+                                  : 'Start Focus Timer',
                             ),
                           ),
-                          GestureDetector(
-                            onTap: () => Navigator.pop(context),
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.close,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cancel'),
                       ),
                     ),
                   ],
                 ),
-                // ✅ Content
-                Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ✅ Task Title
-                      _buildDetailCard(
-                        icon: Icons.description,
-                        title: _currentTask.title,
-                        isDarkMode: isDarkMode,
-                      ),
-                      const SizedBox(height: 12),
-
-                      // ✅ Category
-                      _buildDetailCardWithBadge(
-                        icon: Icons.category,
-                        title: _currentTask.category,
-                        badgeColor: _getCategoryColor(_currentTask.category),
-                        isDarkMode: isDarkMode,
-                      ),
-                      const SizedBox(height: 12),
-
-                      // ✅ Date
-                      _buildDetailCard(
-                        icon: Icons.calendar_today,
-                        title: _formatDate(_currentTask.dueDate),
-                        isDarkMode: isDarkMode,
-                      ),
-                      const SizedBox(height: 12),
-
-                      // ✅ Focus Time
-                      _buildDetailCardWithValue(
-                        icon: Icons.timer_outlined,
-                        title: 'Focus Time',
-                        value: '$_focusTime mins',
-                        onTap: _showFocusTimePicker,
-                        isDarkMode: isDarkMode,
-                      ),
-                      const SizedBox(height: 12),
-
-                      // ✅ Reminder
-                      _buildDetailCardWithValue(
-                        icon: Icons.notifications_active,
-                        title: 'Reminder',
-                        value: _reminderTime.format(context),
-                        onTap: _showReminderTimePicker,
-                        isDarkMode: isDarkMode,
-                      ),
-                      const SizedBox(height: 12),
-
-                      // ✅ Priority
-                      _buildDetailCard(
-                        icon: Icons.priority_high,
-                        title: 'Priority: ${_currentTask.priority.label}',
-                        isDarkMode: isDarkMode,
-                      ),
-                      const SizedBox(height: 24),
-
-                      // ✅ Note Section
-                      Text(
-                        'Note',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: isDarkMode ? Colors.white : Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          // ✅ เปลี่ยนสี container ตามธีม
-                          color: isDarkMode
-                              ? Colors.white.withOpacity(0.08)
-                              : Colors.black.withOpacity(0.05),
-                          border: Border.all(
-                            color: isDarkMode
-                                ? Colors.white.withOpacity(0.2)
-                                : Colors.black.withOpacity(0.1),
-                          ),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(
-                              Icons.note,
-                              color: isDarkMode
-                                  ? Colors.white.withOpacity(0.7)
-                                  : Colors.black.withOpacity(0.5),
-                              size: 24,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                _currentTask.description,
-                                style: TextStyle(
-                                  color: isDarkMode
-                                      ? Colors.white
-                                      : Colors.black87,
-                                  fontSize: 14,
-                                  height: 1.5,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-
-                      const SizedBox(height: 24),
-
-                      // ✅ REMINDERS SECTION
-                      if (_currentTask.reminders.isNotEmpty)
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Reminders',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: isDarkMode ? Colors.white : Colors.black87,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Column(
-                              children: _currentTask.reminders.map((reminder) {
-                                return Container(
-                                  margin: const EdgeInsets.only(bottom: 8),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 12,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isDarkMode
-                                        ? Colors.white.withOpacity(0.08)
-                                        : Colors.black.withOpacity(0.05),
-                                    border: Border.all(
-                                      color: isDarkMode
-                                          ? Colors.white.withOpacity(0.2)
-                                          : Colors.black.withOpacity(0.1),
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: Theme.of(context).primaryColor.withOpacity(0.2),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: Icon(
-                                          Icons.notifications_active,
-                                          color: Theme.of(context).primaryColor,
-                                          size: 18,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(
-                                          reminder.time.format(context),
-                                          style: TextStyle(
-                                            color: isDarkMode ? Colors.white : Colors.black87,
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: reminder.isEnabled
-                                              ? Colors.green.withOpacity(0.2)
-                                              : Colors.grey.withOpacity(0.2),
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          reminder.isEnabled ? 'Active' : 'Inactive',
-                                          style: TextStyle(
-                                            color: reminder.isEnabled
-                                                ? Colors.green
-                                                : Colors.grey,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                            const SizedBox(height: 24),
-                          ],
-                        ),
-
-                      // ✅ Buttons
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () => Navigator.pop(context),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: isDarkMode
-                                    ? Colors.white.withOpacity(0.12)
-                                    : Colors.black.withOpacity(0.1),
-                                side: BorderSide(
-                                  color: isDarkMode
-                                      ? Colors.white.withOpacity(0.3)
-                                      : Colors.black.withOpacity(0.2),
-                                ),
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: Text(
-                                'Cancel',
-                                style: TextStyle(
-                                  color: isDarkMode
-                                      ? Colors.white
-                                      : Colors.black87,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _startFocusTimer,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor:
-                                    Theme.of(context).primaryColor,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: Text(
-                                _isLoading
-                                    ? 'Starting...'
-                                    : 'Start Focus Timer',
-                                style: TextStyle(
-                                  color: isDarkMode
-                                      ? Colors.black87
-                                      : Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
-      ),
-    );
-  }
+      ), // ✅ ปิด SafeArea
+    ),
+  );
+}
 
   Widget _buildDetailCard({
     required IconData icon,
@@ -407,7 +360,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        // ✅ เปลี่ยนสี container ตามธีม
         color: isDarkMode
             ? Colors.white.withOpacity(0.08)
             : Colors.black.withOpacity(0.05),
@@ -626,7 +578,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     switch (category.toLowerCase()) {
       case 'work':
         return const Color(0xFFFFC966);
-      case 'Reading':
+      case 'reading':
         return const Color(0xFFADBDE6);
       case 'personal':
         return const Color(0xFF92C4B7);
